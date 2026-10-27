@@ -7,6 +7,7 @@ corpora and gated terminology assets.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -253,7 +254,24 @@ _LEXICONS: dict[str, SectionLexicon] = {}
 def normalize_section_header(text: str) -> str:
     """Return a script-preserving normalized section header key."""
 
+    if type(text) is str and text.isascii():
+        # ASCII is already NFKC-normalized and casefolds like lower().
+        lowered = text.lower()
+        if lowered.isalnum():
+            return lowered
+        words = lowered.replace("_", " ").split()
+        if "".join(words).isalnum():
+            return " ".join(words)
+        return " ".join(re.sub(r"[!-/:-@\[-`{-~]", " ", lowered).split())
+
     normalized = unicodedata.normalize("NFKC", text).casefold()
+    if type(normalized) is str:
+        # Letters and digits never fall in the P/S/Z categories.
+        words = normalized.replace("_", " ").split()
+        if "".join(words).isalnum():
+            return " ".join(words)
+        if normalized.isascii():
+            return " ".join(re.sub(r"[!-/:-@\[-`{-~]", " ", normalized).split())
     chars: list[str] = []
     for char in normalized:
         category = unicodedata.category(char)
